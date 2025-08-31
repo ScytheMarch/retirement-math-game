@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Retirement Planning Math Game</title>
+<style>
+	:root{
+		--bg:#0f172a;
+		--card:#111827;
+		--muted:#9ca3af;
+		--text:#e5e7eb;
+		--accent:#38bdf8;
+		--ok:#22c55e;
+		--warn:#f59e0b;
+		--bad:#ef4444;
+		--input:#1f2937;
+		--border:#334155;
+		--chip:#0ea5e9;
+	}
+	html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}
+	.container{max-width:1200px;margin:0 auto;padding:16px}
+	header{
+		display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap
+	}
+	header .title{
+		font-size:20px;font-weight:700;display:flex;gap:10px;align-items:center
+	}
+	header .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+	.btn{
+		background:var(--accent);color:#001016;border:none;border-radius:8px;padding:10px 12px;font-weight:600;cursor:pointer
+	}
+	.btn.secondary{background:#1f2937;color:var(--text);border:1px solid var(--border)}
+	.btn.ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+	.btn:active{transform:translateY(1px)}
+	select,input[type="number"],input[type="text"]{
+		background:var(--input);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;min-width:80px
+	}
+	.grid{
+		display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px
+	}
+	@media (max-width: 1024px){
+		.grid{grid-template-columns:1fr}
+	}
+	.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px}
+	.card h3{margin:0 0 10px 0;font-size:16px}
+	.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+	.row > div{display:flex;flex-direction:column;gap:4px}
+	label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+	.help{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#0b2530;color:#9ed9f9;font-weight:900;font-size:11px;cursor:help;border:1px solid #17495a}
+	.kv{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:6px 0;border-bottom:1px dashed #1f2a37}
+	.kv:last-child{border-bottom:none}
+	.value{font-weight:700}
+	.inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+	.badge{background:#0b2530;border:1px solid #17495a;color:#9ed9f9;border-radius:999px;padding:4px 8px;font-size:12px}
+	.answer{
+		display:flex;gap:6px;align-items:center;border:1px solid var(--border);background:var(--input);border-radius:10px;padding:8px
+	}
+	.answer input{flex:1}
+	.status{font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px}
+	.status.ok{background:rgba(34,197,94,.15);color:var(--ok);border:1px solid rgba(34,197,94,.4)}
+	.status.warn{background:rgba(245,158,11,.15);color:var(--warn);border:1px solid rgba(245,158,11,.4)}
+	.status.bad{background:rgba(239,68,68,.15);color:var(--bad);border:1px solid rgba(239,68,68,.4)}
+	.small{font-size:12px;color:var(--muted)}
+	.hint{font-size:12px;color:#fca5a5}
+	.footer-note{font-size:12px;color:var(--muted);margin-top:10px}
+	.section-title{margin-top:8px;margin-bottom:8px;color:#bcd7e8}
+	code,kbd{background:#0b2530;border:1px solid #17495a;color:#9ed9f9;border-radius:6px;padding:2px 6px}
+	.divider{height:1px;background:#1f2937;margin:10px 0}
+	.sol{background:#0b1220;border:1px solid #18233a;border-radius:12px;padding:10px;white-space:pre-wrap;line-height:1.45}
+	/* math styling removed with formulas section */
+	.score{display:flex;gap:8px;flex-wrap:wrap}
+	.score .chip{background:#0b2530;border:1px solid #17495a;border-radius:10px;padding:8px 10px}
+	.flexcol{display:flex;flex-direction:column;gap:8px}
+	.tight{margin:0;padding:0}
+	.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+	.hidden{display:none}
+	hr{border:none;border-top:1px solid #1f2a37;margin:8px 0}
+</style>
+</head>
+<body>
+<div class="container">
+	<header>
+		<div class="title">
+			<span>💼 Retirement Planning Math Game</span>
+			<span class="badge" id="scenarioLabel">Scenario #1</span>
+			<span class="badge" id="methodLabel">Method: Annuity</span>
+		</div>
+		<div class="controls">
+			<label class="inline">Difficulty
+				<select id="difficulty">
+					<option value="easy">Easy</option>
+					<option value="normal" selected>Normal</option>
+					<option value="hard">Hard</option>
+				</select>
+			</label>
+			<label class="inline">Contrib timing
+				<select id="timing">
+					<option value="END">END of year</option>
+					<option value="BEGIN">BEGIN (annuity-due)</option>
+				</select>
+			</label>
+			<label class="inline">Seed
+				<input id="seedInput" type="text" value="123456" style="min-width:120px" />
+			</label>
+			<button class="btn secondary" id="reseed">Re-seed</button>
+			<button class="btn" id="newProblem">New Problem</button>
+			<button class="btn ghost" id="resetRun">Reset Run</button>
+		</div>
+	</header>
+
+	<div class="grid">
+		<!-- Left: Scenario -->
+		<div class="card" id="scenarioCard">
+			<h3>Scenario <span class="small">(editable)</span></h3>
+			<div class="row">
+				<div>
+					<label>Client name</label>
+					<input id="clientName" type="text" />
+				</div>
+				<div>
+					<label>Bio</label>
+					<input id="clientBio" type="text" />
+				</div>
+			</div>
+			<hr />
+			<div class="row">
+				<div>
+					<label>Current Income (today's $)</label>
+					<input id="income" type="text" inputmode="decimal" />
+				</div>
+				<div>
+					<label>WRR (wage replacement rate)</label>
+					<input id="wrr" type="text" inputmode="decimal" />
+				</div>
+				<div>
+					<label>Social Security (today's $)</label>
+					<input id="ss" type="text" inputmode="decimal" />
+				</div>
+				<div>
+					<label>Years to retirement (RWLE)</label>
+					<input id="rwle" type="text" inputmode="decimal" />
+				</div>
+				<div>
+					<label>Years in retirement (RLE)</label>
+					<input id="rle" type="text" inputmode="decimal" />
+				</div>
+				<div>
+					<label>Inflation g (nominal)</label>
+					<input id="inflation" type="text" inputmode="decimal" />
+				</div>
+				<div>
+					<label>Nominal return r</label>
+					<input id="return" type="text" inputmode="decimal" />
+				</div>
+				<div>
+					<label>Current savings (PV_cur)</label>
+					<input id="pvcur" type="text" inputmode="decimal" />
+				</div>
+			</div>
+			<div class="divider"></div>
+			<div class="inline">
+				<button class="btn ghost" id="recalc">Recalculate with my numbers</button>
+				<span class="small" id="constraintsMsg"></span>
+			</div>
+		</div>
+
+		<!-- Middle: User inputs -->
+		<div class="card">
+			<h3>User Inputs</h3>
+			<div class="flexcol">
+				<div>
+					<div class="section-title">
+						Capital at Retirement
+						<span class="help" title="Annuity Method: spend capital to $0 using real-rate annuity-due factor.">i</span>
+						<span class="help" title="CPM: same NOMINAL capital at death, scales Annuity by 1/[1 - (1+r)^(-RLE)].">i</span>
+						<span class="help" title="PPPM: same REAL capital at death, scales Annuity by 1/[1 - ((1+g)/(1+r))^RLE].">i</span>
+					</div>
+					<div class="row">
+						<div id="grp_cap_ann">
+							<label>Annuity Method</label>
+							<div class="answer">
+								<input id="ans_cap_ann" type="text" inputmode="decimal" />
+								<span class="status" id="st_cap_ann"></span>
+							</div>
+							<div class="hint" id="hint_cap_ann"></div>
+						</div>
+						<div id="grp_cap_cpm">
+							<label>CPM</label>
+							<div class="answer">
+								<input id="ans_cap_cpm" type="text" inputmode="decimal" />
+								<span class="status" id="st_cap_cpm"></span>
+							</div>
+							<div class="hint" id="hint_cap_cpm"></div>
+						</div>
+						<div id="grp_cap_pppm">
+							<label>PPPM</label>
+							<div class="answer">
+								<input id="ans_cap_pppm" type="text" inputmode="decimal" />
+								<span class="status" id="st_cap_pppm"></span>
+							</div>
+							<div class="hint" id="hint_cap_pppm"></div>
+						</div>
+					</div>
+				</div>
+				<div class="divider"></div>
+				<div>
+					<div class="section-title">
+						Annual Savings Needed
+						<span class="help" title="Solve nominal accumulation over RWLE years; adjust for BEGIN timing by dividing by (1+r).">i</span>
+					</div>
+					<div class="row">
+						<div id="grp_sv_ann">
+							<label>For Annuity target</label>
+							<div class="answer">
+								<input id="ans_sv_ann" type="text" inputmode="decimal" />
+								<span class="status" id="st_sv_ann"></span>
+							</div>
+							<div class="hint" id="hint_sv_ann"></div>
+						</div>
+						<div id="grp_sv_cpm">
+							<label>For CPM target</label>
+							<div class="answer">
+								<input id="ans_sv_cpm" type="text" inputmode="decimal" />
+								<span class="status" id="st_sv_cpm"></span>
+							</div>
+							<div class="hint" id="hint_sv_cpm"></div>
+						</div>
+						<div id="grp_sv_pppm">
+							<label>For PPPM target</label>
+							<div class="answer">
+								<input id="ans_sv_pppm" type="text" inputmode="decimal" />
+								<span class="status" id="st_sv_pppm"></span>
+							</div>
+							<div class="hint" id="hint_sv_pppm"></div>
+						</div>
+					</div>
+					<div class="small">
+						Timing for savings uses: <span id="timingLabel" class="badge"></span>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Right: Actions / Results -->
+		<div class="card">
+			<h3>Actions & Results</h3>
+			<div class="inline">
+				<button class="btn" id="check">Check Answers</button>
+				<button class="btn secondary" id="showSolution">Show Solution</button>
+				<button class="btn ghost" id="toggleTruth">Show Details</button>
+			</div>
+			<div class="divider"></div>
+			<div class="score">
+				<div class="chip">Attempted: <span id="sc_attempted" class="value">0</span></div>
+				<div class="chip">All-correct: <span id="sc_correct" class="value">0</span></div>
+				<div class="chip">Avg error: <span id="sc_avgerr" class="value">0.00%</span></div>
+			</div>
+			<div class="divider"></div>
+			<div id="truthBlock" class="hidden">
+				<div class="kv"><span>Need today</span><span class="value" id="need_today_v"></span></div>
+				<div class="kv"><span>First-year need at retirement (PMT1)</span><span class="value" id="pmt1_v"></span></div>
+				<div class="kv"><span>Real rate r_real</span><span class="value" id="rreal_v"></span></div>
+				<div class="kv"><span>FV of current savings at retirement</span><span class="value" id="fvcur_v"></span></div>
+				<div class="kv" id="kv_cap_ann"><span>Capital Annuity (truth)</span><span class="value" id="cap_ann_v"></span></div>
+				<div class="kv" id="kv_cap_cpm"><span>Capital CPM (truth)</span><span class="value" id="cap_cpm_v"></span></div>
+				<div class="kv" id="kv_cap_pppm"><span>Capital PPPM (truth)</span><span class="value" id="cap_pppm_v"></span></div>
+				<div class="kv" id="kv_sv_ann"><span>Annual savings for Annuity</span><span class="value" id="sv_ann_v"></span></div>
+				<div class="kv" id="kv_sv_cpm"><span>Annual savings for CPM</span><span class="value" id="sv_cpm_v"></span></div>
+				<div class="kv" id="kv_sv_pppm"><span>Annual savings for PPPM</span><span class="value" id="sv_pppm_v"></span></div>
+			</div>
+			<div class="divider"></div>
+			<div id="solutionBlock" class="sol hidden"></div>
+
+		</div>
+	</div>
+</div>
+
+<!-- Methods reminder card -->
+<div class="container">
+	<div class="card" id="methodsHelp">
+		<h3>Methods reminder</h3>
+		<ul class="tight">
+			<li><strong>Annuity Method</strong>: Spend capital to $0 by the last year. Capital equals the present value (at the real rate) of an inflation-indexed annuity for RLE years using annuity‑due timing.</li>
+			<li><strong>CPM</strong> (Capital Preservation, nominal): Keep the same nominal dollar capital at death as at retirement.</li>
+			<li><strong>PPPM</strong> (Purchasing Power Preservation, real): Keep the same real (inflation‑adjusted) capital at death.</li>
+		</ul>
+	</div>
+</div>
+
+<!-- (Sanity-check and formulas removed as requested) -->
+
+<script>
+/** ---------- Formatting Helpers ---------- */
+const currencyFmt = new Intl.NumberFormat(undefined,{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2});
+const numberFmt = new Intl.NumberFormat(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const percentFmt = new Intl.NumberFormat(undefined,{style:'percent',minimumFractionDigits:2,maximumFractionDigits:2});
+function fmt(n){return currencyFmt.format(n||0);} 
+function pct(x){return percentFmt.format(x||0);} 
+
+// Input parsing/formatting helpers
+function stripNumeric(s){return (s||'').toString().replace(/[^0-9.\-]/g,'');}
+function parseNum(s){const v = parseFloat(stripNumeric(s)); return isFinite(v)?v:0;}
+function parseCurrency(s){return parseNum(s);} // same parser
+function parsePercentToDecimal(s){
+    const str = (s||'').toString().trim();
+    if (!str) return 0;
+    const hasPct = /%/.test(str);
+    const v = parseNum(str);
+    if (!isFinite(v)) return 0;
+    return (hasPct || v > 1) ? v/100 : v; // allow entering 0.03 or 3%
+}
+function formatCurrency(v){return fmt(v);} 
+function formatPercent(vDec){return pct(vDec);} 
+function formatNumber2(v){return numberFmt.format(v||0);} 
+
+/** ---------- Seeded RNG (Mulberry32 + splitmix-like) ---------- */
+function mulberry32(a){
+    let t = a >>> 0;
+    return function(){
+        t += 0x6D2B79F5;
+        let r = Math.imul(t ^ (t >>> 15), 1 | t);
+        r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+        return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    };
+}
+function splitSeed(baseSeed, idx){
+    const GOLD = 0x9E3779B9; // 2^32 / golden ratio approx
+    return (baseSeed ^ Math.imul(idx+1, GOLD)) >>> 0;
+}
+function hashToSeed(str){
+    let h = 2166136261 >>> 0;
+    for(let i=0;i<str.length;i++){
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+}
+function randInt(rng, lo, hi){ // inclusive
+    return lo + Math.floor(rng() * (hi - lo + 1));
+}
+function randFloat(rng, lo, hi){
+    return lo + rng() * (hi - lo);
+}
+
+/** ---------- Scenario Ranges ---------- */
+const RANGES = {
+    easy:{
+        income:[50000,90000],
+        wrr:[0.65,0.85],
+        ss:[12000,28000],
+        rwle:[15,25],
+        rle:[20,30],
+        g:[0.02,0.035],
+        r:[0.06,0.09],
+        pvcur:[0,50000]
+    },
+    normal:{
+        income:[60000,120000],
+        wrr:[0.70,0.85],
+        ss:[15000,30000],
+        rwle:[20,35],
+        rle:[20,35],
+        g:[0.02,0.04],
+        r:[0.07,0.10],
+        pvcur:[0,200000]
+    },
+    hard:{
+        income:[80000,180000],
+        wrr:[0.70,0.90],
+        ss:[15000,40000],
+        rwle:[10,35],
+        rle:[20,35],
+        g:[0.025,0.045],
+        r:[0.07,0.11],
+        pvcur:[0,400000]
+    }
+};
+
+/** ---------- Flavor: Names & Bios ---------- */
+const FIRST = ["Alex","Jordan","Taylor","Morgan","Riley","Casey","Drew","Blake","Avery","Harper","Logan","Quinn","Shawn","Elliot"];
+const LAST = ["Reeves","Kim","Singh","Garcia","O'Neil","Hernandez","Chen","Patel","Nguyen","Carter","Diaz","Morgan","Lee","Bennett"];
+const BIOS = [
+    "Mid-career analyst who loves hiking and budgeting.",
+    "Small business owner planning to scale down in 10 years.",
+    "Teacher aiming for earlier retirement to travel.",
+    "Engineer optimizing savings after a recent raise.",
+    "Healthcare worker balancing loans and savings.",
+    "Freelancer with variable income focusing on consistency.",
+    "Manager planning to support two kids through college.",
+    "Nonprofit professional seeking sustainable withdrawals."
+];
+
+/** ---------- Math (Pure Functions) ---------- */
+/*
+Step 1 — need_today = max(0, WRR * Income_0 - SS_0)
+Step 2 — PMT1 = need_today * (1 + g)^RWLE
+Step 3 — real rate: r_real = (1 + r) / (1 + g) - 1
+A) Capital_Annuity = PMT1 * [ (1 - (1 + r_real)^(-RLE)) / r_real ] * (1 + r_real)
+B) Capital_CPM = Capital_Annuity / [1 - (1 + r)^(-RLE)]
+C) Capital_PPPM = Capital_Annuity / [1 - ((1 + g)/(1 + r))^RLE]
+Step 4 — Annual Savings PMT (nominal accumulation to K) with PV_cur:
+    END: FV_total = PV_cur*(1+r)^N + PMT * [((1+r)^N - 1)/r] = K
+    BEGIN: PMT_BEGIN = PMT_END / (1+r)
+*/
+function computeRealRate(r, g){
+    return (1 + r) / (1 + g) - 1;
+}
+function capitalAnnuity(PMT1, r_real, RLE){
+    // Guard near-zero real rate: limit -> PMT1 * RLE (annuity due factor (1 + r_real) -> 1)
+    if (Math.abs(r_real) < 1e-12){
+        return PMT1 * RLE;
+    }
+    const factor = (1 - Math.pow(1 + r_real, -RLE)) / r_real;
+    return PMT1 * factor * (1 + r_real);
+}
+function capitalCPM(capAnnuity, r, RLE){
+    const denom = 1 - Math.pow(1 + r, -RLE);
+    return capAnnuity / denom;
+}
+function capitalPPPM(capAnnuity, r, g, RLE){
+    const ratio = (1 + g) / (1 + r);
+    const denom = 1 - Math.pow(ratio, RLE);
+    return capAnnuity / denom;
+}
+function annualSavings(PV_cur, K, r, N, timing /* 'END'|'BEGIN' */){
+    // If current savings already exceed target's FV need (impossible since K is at retirement, but PV_cur grows)
+    // We compute required FV from contributions:
+    const FV_existing = PV_cur * Math.pow(1 + r, N);
+    let FV_needed = K - FV_existing;
+    if (FV_needed <= 0) return 0;
+    let pmt_end;
+    if (Math.abs(r) < 1e-12){
+        // No growth: simple average contributions
+        pmt_end = FV_needed / N;
+    } else {
+        const ann = (Math.pow(1 + r, N) - 1) / r;
+        pmt_end = FV_needed / ann;
+    }
+    return timing === 'BEGIN' ? pmt_end / (1 + r) : pmt_end;
+}
+
+/** ---------- Scenario Generation (Pure) ---------- */
+function generateScenario(seed, difficulty){
+    const ranges = RANGES[difficulty] || RANGES.normal;
+    let attempts = 0;
+    while (attempts++ < 1000){
+        const rng = mulberry32(seed >>> 0);
+        // Draw fields deterministically from this seed and a rolling index to diversify
+        const income = randInt(rng, ranges.income[0], ranges.income[1]);
+        const wrr = randFloat(rng, ranges.wrr[0], ranges.wrr[1]);
+        const ss = randInt(rng, ranges.ss[0], ranges.ss[1]);
+        const rwle = randInt(rng, ranges.rwle[0], ranges.rwle[1]);
+        const rle = randInt(rng, ranges.rle[0], ranges.rle[1]);
+        const g = randFloat(rng, ranges.g[0], ranges.g[1]);
+        let r = randFloat(rng, ranges.r[0], ranges.r[1]);
+        const pvcur = randInt(rng, ranges.pvcur[0], ranges.pvcur[1]);
+        // Flavor
+        const name = `${FIRST[randInt(rng,0,FIRST.length-1)]} ${LAST[randInt(rng,0,LAST.length-1)]}`;
+        const bio = BIOS[randInt(rng,0,BIOS.length-1)];
+
+        // Constraints
+        if (!(rwle > 0 && rle > 0)) { seed = (seed + 1) >>> 0; continue; }
+        if (r <= g){ // enforce r > g
+            // Try nudging r upward a tiny epsilon within allowed top cap
+            r = Math.max(r, g + 0.0005);
+            if (r <= g){ seed = (seed + 1) >>> 0; continue; }
+        }
+        const need_today = Math.max(0, wrr * income - ss);
+        // Valid
+        return {seed, difficulty, name, bio, income, wrr, ss, rwle, rle, g, r, pvcur, need_today};
+    }
+    throw new Error("Failed to generate scenario with constraints after many attempts.");
+}
+
+/** ---------- Deterministic New Problem Series ---------- */
+let baseSeed = 123456 >>> 0;
+let problemIndex = 0;
+
+/** ---------- State ---------- */
+let state = {
+    difficulty:'normal',
+    contribTiming:'END',
+    scenario:null,
+    truth:null,
+    activeMethod:'ann' // 'ann' | 'cpm' | 'pppm'
+};
+
+/** ---------- UI Elements ---------- */
+const els = {
+    scenarioLabel: document.getElementById('scenarioLabel'),
+    difficulty: document.getElementById('difficulty'),
+    timing: document.getElementById('timing'),
+    seedInput: document.getElementById('seedInput'),
+    reseed: document.getElementById('reseed'),
+    newProblem: document.getElementById('newProblem'),
+    recalc: document.getElementById('recalc'),
+    constraintsMsg: document.getElementById('constraintsMsg'),
+
+    clientName: document.getElementById('clientName'),
+    clientBio: document.getElementById('clientBio'),
+    income: document.getElementById('income'),
+    wrr: document.getElementById('wrr'),
+    ss: document.getElementById('ss'),
+    rwle: document.getElementById('rwle'),
+    rle: document.getElementById('rle'),
+    inflation: document.getElementById('inflation'),
+    return: document.getElementById('return'),
+    pvcur: document.getElementById('pvcur'),
+
+    need_today_v: document.getElementById('need_today_v'),
+    pmt1_v: document.getElementById('pmt1_v'),
+    rreal_v: document.getElementById('rreal_v'),
+    fvcur_v: document.getElementById('fvcur_v'),
+    cap_ann_v: document.getElementById('cap_ann_v'),
+    cap_cpm_v: document.getElementById('cap_cpm_v'),
+    cap_pppm_v: document.getElementById('cap_pppm_v'),
+    sv_ann_v: document.getElementById('sv_ann_v'),
+    sv_cpm_v: document.getElementById('sv_cpm_v'),
+    sv_pppm_v: document.getElementById('sv_pppm_v'),
+    timingLabel: document.getElementById('timingLabel'),
+
+    // Answers
+    ans_cap_ann: document.getElementById('ans_cap_ann'),
+    ans_cap_cpm: document.getElementById('ans_cap_cpm'),
+    ans_cap_pppm: document.getElementById('ans_cap_pppm'),
+    ans_sv_ann: document.getElementById('ans_sv_ann'),
+    ans_sv_cpm: document.getElementById('ans_sv_cpm'),
+    ans_sv_pppm: document.getElementById('ans_sv_pppm'),
+
+    // Status + hints
+    st_cap_ann: document.getElementById('st_cap_ann'),
+    st_cap_cpm: document.getElementById('st_cap_cpm'),
+    st_cap_pppm: document.getElementById('st_cap_pppm'),
+    st_sv_ann: document.getElementById('st_sv_ann'),
+    st_sv_cpm: document.getElementById('st_sv_cpm'),
+    st_sv_pppm: document.getElementById('st_sv_pppm'),
+    hint_cap_ann: document.getElementById('hint_cap_ann'),
+    hint_cap_cpm: document.getElementById('hint_cap_cpm'),
+    hint_cap_pppm: document.getElementById('hint_cap_pppm'),
+    hint_sv_ann: document.getElementById('hint_sv_ann'),
+    hint_sv_cpm: document.getElementById('hint_sv_cpm'),
+    hint_sv_pppm: document.getElementById('hint_sv_pppm'),
+
+    check: document.getElementById('check'),
+    showSolution: document.getElementById('showSolution'),
+    solutionBlock: document.getElementById('solutionBlock'),
+
+    // Scoreboard
+    sc_attempted: document.getElementById('sc_attempted'),
+    sc_correct: document.getElementById('sc_correct'),
+    sc_avgerr: document.getElementById('sc_avgerr'),
+    toggleTruth: document.getElementById('toggleTruth'),
+    truthBlock: document.getElementById('truthBlock'),
+    methodLabel: document.getElementById('methodLabel'),
+    resetRun: document.getElementById('resetRun'),
+    // groups for conditional visibility
+    grp_cap_cpm: document.getElementById('grp_cap_cpm'),
+    grp_cap_pppm: document.getElementById('grp_cap_pppm'),
+    grp_cap_ann: document.getElementById('grp_cap_ann'),
+    grp_sv_ann: document.getElementById('grp_sv_ann'),
+    grp_sv_cpm: document.getElementById('grp_sv_cpm'),
+    grp_sv_pppm: document.getElementById('grp_sv_pppm'),
+    kv_cap_ann: document.getElementById('kv_cap_ann'),
+    kv_cap_cpm: document.getElementById('kv_cap_cpm'),
+    kv_cap_pppm: document.getElementById('kv_cap_pppm'),
+    kv_sv_ann: document.getElementById('kv_sv_ann'),
+    kv_sv_cpm: document.getElementById('kv_sv_cpm'),
+    kv_sv_pppm: document.getElementById('kv_sv_pppm')
+};
+
+/** ---------- Scoreboard (localStorage) ---------- */
+const SCORE_KEY = 'retire_game_score_v1';
+function loadScore(){
+    try{
+        const s = JSON.parse(localStorage.getItem(SCORE_KEY) || '{}');
+        return {attempted:s.attempted||0, correct:s.correct||0, totalError:s.totalError||0, gradedFields:s.gradedFields||0};
+    }catch(e){return {attempted:0,correct:0,totalError:0,gradedFields:0}}
+}
+function saveScore(sc){
+    localStorage.setItem(SCORE_KEY, JSON.stringify(sc));
+}
+function updateScoreUI(sc){
+    els.sc_attempted.textContent = sc.attempted;
+    els.sc_correct.textContent = sc.correct;
+    const avg = sc.gradedFields>0 ? (sc.totalError / sc.gradedFields) : 0;
+    els.sc_avgerr.textContent = (avg*100).toFixed(2) + '%';
+}
+
+/** ---------- Compute Truth for Scenario ---------- */
+function computeTruth(scn, timing){
+    // Steps per spec
+    const need_today = Math.max(0, scn.wrr * scn.income - scn.ss);
+    const PMT1 = need_today * Math.pow(1 + scn.g, scn.rwle);
+    const r_real = computeRealRate(scn.r, scn.g);
+    const capA = capitalAnnuity(PMT1, r_real, scn.rle);
+    const capCPM = capitalCPM(capA, scn.r, scn.rle);
+    const capPPPM = capitalPPPM(capA, scn.r, scn.g, scn.rle);
+    const FV_cur = scn.pvcur * Math.pow(1 + scn.r, scn.rwle);
+
+    // Annual savings per target K
+    const svA = annualSavings(scn.pvcur, capA, scn.r, scn.rwle, timing);
+    const svCPM = annualSavings(scn.pvcur, capCPM, scn.r, scn.rwle, timing);
+    const svPPPM = annualSavings(scn.pvcur, capPPPM, scn.r, scn.rwle, timing);
+
+    return {
+        need_today, PMT1, r_real, FV_cur,
+        capA, capCPM, capPPPM,
+        svA, svCPM, svPPPM
+    };
+}
+
+/** ---------- Render Scenario + Truth ---------- */
+function renderScenario(){
+    const scn = state.scenario;
+    const t = state.truth;
+    els.clientName.value = scn.name;
+    els.clientBio.value = scn.bio;
+    // Fill inputs with nicely formatted values
+    els.income.value = formatCurrency(scn.income);
+    els.wrr.value = formatPercent(scn.wrr);
+    els.ss.value = formatCurrency(scn.ss);
+    els.rwle.value = formatNumber2(scn.rwle);
+    els.rle.value = formatNumber2(scn.rle);
+    els.inflation.value = formatPercent(scn.g);
+    els.return.value = formatPercent(scn.r);
+    els.pvcur.value = formatCurrency(scn.pvcur);
+
+    els.need_today_v.textContent = fmt(t.need_today);
+    els.pmt1_v.textContent = fmt(t.PMT1);
+    els.rreal_v.textContent = pct(t.r_real);
+    els.fvcur_v.textContent = fmt(t.FV_cur);
+    els.cap_ann_v.textContent = fmt(t.capA);
+    els.cap_cpm_v.textContent = fmt(t.capCPM);
+    els.cap_pppm_v.textContent = fmt(t.capPPPM);
+    els.sv_ann_v.textContent = fmt(t.svA);
+    els.sv_cpm_v.textContent = fmt(t.svCPM);
+    els.sv_pppm_v.textContent = fmt(t.svPPPM);
+    els.timingLabel.textContent = state.contribTiming;
+    els.scenarioLabel.textContent = `Scenario #${problemIndex+1}`;
+    // Show active method label
+    const methodName = state.activeMethod==='ann' ? 'Annuity' : state.activeMethod==='cpm' ? 'CPM' : 'PPPM';
+    els.methodLabel.textContent = `Method: ${methodName}`;
+
+    els.constraintsMsg.textContent = (scn.r > scn.g) ? '' : 'Adjusted to enforce r > g';
+
+    // Toggle visibility so only active method fields are visible
+    // Inputs groups
+    els.grp_cap_ann.style.display = (state.activeMethod==='ann') ? '' : 'none';
+    els.grp_cap_cpm.style.display = (state.activeMethod==='cpm') ? '' : 'none';
+    els.grp_cap_pppm.style.display = (state.activeMethod==='pppm') ? '' : 'none';
+    els.grp_sv_ann.style.display = (state.activeMethod==='ann') ? '' : 'none';
+    els.grp_sv_cpm.style.display = (state.activeMethod==='cpm') ? '' : 'none';
+    els.grp_sv_pppm.style.display = (state.activeMethod==='pppm') ? '' : 'none';
+    // Truth rows
+    els.kv_cap_ann.style.display = (state.activeMethod==='ann') ? '' : 'none';
+    els.kv_cap_cpm.style.display = (state.activeMethod==='cpm') ? '' : 'none';
+    els.kv_cap_pppm.style.display = (state.activeMethod==='pppm') ? '' : 'none';
+    els.kv_sv_ann.style.display = (state.activeMethod==='ann') ? '' : 'none';
+    els.kv_sv_cpm.style.display = (state.activeMethod==='cpm') ? '' : 'none';
+    els.kv_sv_pppm.style.display = (state.activeMethod==='pppm') ? '' : 'none';
+}
+
+/** ---------- Build Solution Text ---------- */
+function buildSolutionText(scn, tr){
+    const lines = [];
+    lines.push(`Inputs:`);
+    lines.push(`  Income_0 = ${fmt(scn.income)}, WRR = ${pct(scn.wrr)}, SS_0 = ${fmt(scn.ss)}`);
+    lines.push(`  RWLE = ${scn.rwle} years, RLE = ${scn.rle} years`);
+    lines.push(`  Inflation g = ${pct(scn.g)}, Nominal return r = ${pct(scn.r)}`);
+    lines.push(`  Current savings PV_cur = ${fmt(scn.pvcur)}, Timing = ${state.contribTiming}`);
+    lines.push(``);
+    lines.push(`Step 1 — need_today = max(0, WRR * Income_0 - SS_0)`);
+    lines.push(`  = max(0, ${pct(scn.wrr)} × ${fmt(scn.income)} - ${fmt(scn.ss)}) = ${fmt(tr.need_today)}`);
+    lines.push(`Step 2 — PMT1 = need_today × (1 + g)^RWLE`);
+    lines.push(`  = ${fmt(tr.need_today)} × (1 + ${pct(scn.g)})^${scn.rwle} = ${fmt(tr.PMT1)}`);
+    lines.push(`Step 3 — r_real = (1 + r)/(1 + g) - 1 = (1 + ${pct(scn.r)})/(1 + ${pct(scn.g)}) - 1 = ${pct(tr.r_real)}`);
+    lines.push(``);
+    lines.push(`A) Capital_Annuity = PMT1 × [ (1 - (1 + r_real)^(-RLE)) / r_real ] × (1 + r_real)`);
+    const factor = (1 - Math.pow(1 + tr.r_real, -scn.rle)) / (Math.abs(tr.r_real)<1e-12?1:tr.r_real);
+    lines.push(`   factor = (1 - (1 + ${pct(tr.r_real)})^(-${scn.rle})) / ${tr.r_real.toFixed(6)} = ${numberFmt.format(factor)}`);
+    lines.push(`   → Capital_Annuity = ${fmt(tr.PMT1)} × ${numberFmt.format(factor)} × (1 + ${pct(tr.r_real)}) = ${fmt(tr.capA)}`);
+    lines.push(``);
+    lines.push(`B) Capital_CPM: X = Capital_Annuity + X/(1 + r)^RLE`);
+    lines.push(`   ⇒ X × [1 - (1 + r)^(-RLE)] = Capital_Annuity`);
+    const denomCPM = 1 - Math.pow(1 + scn.r, -scn.rle);
+    lines.push(`   denom = 1 - (1 + ${pct(scn.r)})^(-${scn.rle}) = ${denomCPM.toFixed(6)}`);
+    lines.push(`   → Capital_CPM = ${fmt(tr.capA)} / ${denomCPM.toFixed(6)} = ${fmt(tr.capCPM)}`);
+    lines.push(``);
+    lines.push(`C) Capital_PPPM: X = Capital_Annuity + X × ((1 + g)/(1 + r))^RLE`);
+    const ratio = (1 + scn.g)/(1 + scn.r);
+    const denomPP = 1 - Math.pow(ratio, scn.rle);
+    lines.push(`   ⇒ X × [1 - ((1 + g)/(1 + r))^RLE] = Capital_Annuity`);
+    lines.push(`   denom = 1 - ((${1+scn.g.toFixed? (1+scn.g).toFixed(6):(1+scn.g)})/(${1+scn.r.toFixed? (1+scn.r).toFixed(6):(1+scn.r)}))^${scn.rle} = ${denomPP.toFixed(6)}`);
+    lines.push(`   → Capital_PPPM = ${fmt(tr.capA)} / ${denomPP.toFixed(6)} = ${fmt(tr.capPPPM)}`);
+    lines.push(``);
+    lines.push(`Step 4 — Annual savings to reach K over RWLE years (nominal)`);
+    lines.push(`  END: PMT = (K - PV_cur*(1+r)^N) × r / ((1+r)^N - 1)`);
+    lines.push(`  BEGIN: PMT_BEGIN = PMT_END / (1 + r)`);
+    lines.push(`  For Annuity target K=${fmt(tr.capA)} → PMT_${state.contribTiming} = ${fmt(tr.svA)}`);
+    lines.push(`  For CPM target K=${fmt(tr.capCPM)} → PMT_${state.contribTiming} = ${fmt(tr.svCPM)}`);
+    lines.push(`  For PPPM target K=${fmt(tr.capPPPM)} → PMT_${state.contribTiming} = ${fmt(tr.svPPPM)}`);
+    return lines.join('\n');
+}
+
+function buildBA2Text(scn, tr, method, timing){
+    const lines = [];
+    // Annuity base in BGN using real rate
+    const iyp = tr.r_real * 100;
+    lines.push(`Annuity base (BGN):`);
+    lines.push(`2nd BGN → SET → 2nd QUIT`);
+    lines.push(`N=${scn.rle}, I/Y=${numberFmt.format(iyp)}, PMT=${fmt(-tr.PMT1)}, FV=0, CPT PV → ${fmt(tr.capA)}`);
+    lines.push('');
+    if (method === 'cpm'){
+        const denomCPM = 1 - Math.pow(1 + scn.r, -scn.rle);
+        lines.push(`CPM capital:`);
+        lines.push(`Denominator = 1 − (1+r)^(-RLE) = ${numberFmt.format(denomCPM)}`);
+        lines.push(`${fmt(tr.capA)} ÷ ${numberFmt.format(denomCPM)} → ${fmt(tr.capCPM)}`);
+    } else if (method === 'pppm'){
+        const ratio = (1+scn.g)/(1+scn.r);
+        lines.push(`PPPM capital:`);
+        lines.push(`Compute ratio: (1+g)/(1+r) = ${numberFmt.format(ratio)}`);
+        lines.push(`Raise: ratio y^x RLE → ${numberFmt.format(Math.pow(ratio, scn.rle))}`);
+        lines.push(`Denominator = 1 − ratio^RLE = ${numberFmt.format(1 - Math.pow(ratio, scn.rle))}`);
+        lines.push(`${fmt(tr.capA)} ÷ denominator → ${fmt(tr.capPPPM)}`);
+    } else {
+        lines.push(`Annuity method capital is PV above (spend to $0).`);
+    }
+    lines.push('');
+    // Accumulation PMT to target
+    const K = method==='ann'? tr.capA : method==='cpm'? tr.capCPM : tr.capPPPM;
+    const iyn = scn.r * 100;
+    lines.push(`Savings to K (${timing}):`);
+    if (timing === 'BEGIN') lines.push(`2nd BGN → SET → 2nd QUIT`);
+    lines.push(`N=${scn.rwle}, I/Y=${numberFmt.format(iyn)}, PV=${fmt(-scn.pvcur)}, FV=${fmt(K)}, CPT PMT → ${fmt(method==='ann'? tr.svA : method==='cpm'? tr.svCPM : tr.svPPPM)}`);
+    return lines.join('\n');
+}
+
+/** ---------- Grading ---------- */
+function gradeField(userVal, truthVal){
+    if (!isFinite(userVal)) return {status:'bad', errPct:1, errAbs:Infinity};
+    const absErr = Math.abs(userVal - truthVal);
+    const pctErr = truthVal === 0 ? (absErr > 0 ? 1 : 0) : Math.abs(absErr / truthVal);
+    const tolDollar = 500;
+    const tolPctStrict = 0.01; // 1%
+    const tolPctAlmost = 0.03; // 3%
+    const withinDollar = absErr <= tolDollar;
+    const withinPct1 = pctErr <= tolPctStrict;
+    const withinPct3 = pctErr <= tolPctAlmost;
+
+    // Correct if within ±1% or ±$500 (whichever larger)
+    const correct = withinPct1 || withinDollar;
+    if (correct) return {status:'ok', errPct:pctErr, errAbs:absErr};
+    if (withinPct3) return {status:'warn', errPct:pctErr, errAbs:absErr};
+    return {status:'bad', errPct:pctErr, errAbs:absErr};
+}
+function setStatus(el, status){
+    el.classList.remove('ok','warn','bad');
+    if (status==='ok') el.classList.add('ok');
+    else if (status==='warn') el.classList.add('warn');
+    else el.classList.add('bad');
+}
+function maybeHint(fieldKey, userVal, truth, scn){
+    // Heuristics:
+    // - If Annuity capital close to using nominal r instead of real r → hint real vs nominal
+    // - If savings close to off by (1+r) factor → hint BEGIN vs END
+    if (fieldKey.startsWith('cap_ann')){
+        const usingNominal = capitalAnnuity(truth.PMT1, computeRealRate(scn.r, 0), scn.rle); // counterfeit (wrong) using g=0
+        if (Math.abs(userVal - usingNominal)/truth.capA < 0.03){
+            return 'Check real rate vs nominal return in annuity.';
+        }
+    }
+    if (fieldKey.startsWith('sv_')){
+        // If userVal * (1+r) ≈ correct or vice versa, timing issue
+        const key = fieldKey.split('_')[1];
+        const correct = key==='ann' ? truth.svA : key==='cpm' ? truth.svCPM : truth.svPPPM;
+        const r = scn.r;
+        if (Math.abs(userVal*(1+r) - correct)/correct < 0.03 || Math.abs(userVal - correct*(1+r))/correct < 0.03){
+            return 'Check BEGIN vs END contribution timing.';
+        }
+    }
+    // Generic
+    return 'Re-check formula inputs and units.';
+}
+
+/** ---------- Wire Events ---------- */
+function parseScenarioFromInputs(){
+    const scn = {...state.scenario};
+    scn.name = els.clientName.value.trim() || scn.name;
+    scn.bio = els.clientBio.value.trim() || scn.bio;
+    scn.income = parseCurrency(els.income.value);
+    scn.wrr = parsePercentToDecimal(els.wrr.value);
+    scn.ss = parseCurrency(els.ss.value);
+    scn.rwle = Math.max(1, Math.round(parseNum(els.rwle.value)));
+    scn.rle = Math.max(1, Math.round(parseNum(els.rle.value)));
+    scn.g = parsePercentToDecimal(els.inflation.value);
+    scn.r = parsePercentToDecimal(els.return.value);
+    scn.pvcur = Math.max(0, parseCurrency(els.pvcur.value));
+    scn.need_today = Math.max(0, scn.wrr * scn.income - scn.ss);
+    // Enforce r > g
+    if (!(scn.r > scn.g)){
+        els.constraintsMsg.textContent = 'Adjusted: r must be > g';
+        scn.r = scn.g + 0.0005;
+    }
+    return scn;
+}
+function clearUserAnswers(){
+    ['ans_cap_ann','ans_cap_cpm','ans_cap_pppm','ans_sv_ann','ans_sv_cpm','ans_sv_pppm'].forEach(id=>{
+        els[id].value = '';
+    });
+    ['st_cap_ann','st_cap_cpm','st_cap_pppm','st_sv_ann','st_sv_cpm','st_sv_pppm'].forEach(id=>{
+        els[id].textContent = '';
+        els[id].className = 'status';
+    });
+    ['hint_cap_ann','hint_cap_cpm','hint_cap_pppm','hint_sv_ann','hint_sv_cpm','hint_sv_pppm'].forEach(id=>{
+        els[id].textContent = '';
+    });
+}
+function newScenario(){
+    const seedStr = (els.seedInput.value||'').trim();
+    const seed = /^\d+$/.test(seedStr) ? (Number(seedStr)>>>0) : hashToSeed(seedStr);
+    baseSeed = seed>>>0;
+
+    const diff = els.difficulty.value;
+    state.difficulty = diff;
+    const useSeed = splitSeed(baseSeed, problemIndex);
+    const scn = generateScenario(useSeed, diff);
+    state.scenario = scn;
+    state.truth = computeTruth(scn, state.contribTiming);
+    // Randomly choose active method each problem
+    const methods = ['ann','cpm','pppm'];
+    state.activeMethod = methods[Math.floor(Math.random()*methods.length)];
+    renderScenario();
+    clearUserAnswers();
+    els.solutionBlock.classList.add('hidden');
+}
+function recalcWithEdits(){
+    const scn = parseScenarioFromInputs();
+    state.scenario = scn;
+    state.truth = computeTruth(scn, state.contribTiming);
+    renderScenario();
+}
+function gradeAll(){
+    const scn = state.scenario;
+    const tr = state.truth;
+    const fieldsAll = [
+        {key:'cap_ann', elI:els.ans_cap_ann, truth:tr.capA, st:els.st_cap_ann, hint:els.hint_cap_ann, method:'ann'},
+        {key:'cap_cpm', elI:els.ans_cap_cpm, truth:tr.capCPM, st:els.st_cap_cpm, hint:els.hint_cap_cpm, method:'cpm'},
+        {key:'cap_pppm', elI:els.ans_cap_pppm, truth:tr.capPPPM, st:els.st_cap_pppm, hint:els.hint_cap_pppm, method:'pppm'},
+        {key:'sv_ann', elI:els.ans_sv_ann, truth:tr.svA, st:els.st_sv_ann, hint:els.hint_sv_ann, method:'ann'},
+        {key:'sv_cpm', elI:els.ans_sv_cpm, truth:tr.svCPM, st:els.st_sv_cpm, hint:els.hint_sv_cpm, method:'cpm'},
+        {key:'sv_pppm', elI:els.ans_sv_pppm, truth:tr.svPPPM, st:els.st_sv_pppm, hint:els.hint_sv_pppm, method:'pppm'}
+    ];
+    const fields = fieldsAll.filter(f => f.method === state.activeMethod);
+    let allCorrect = true;
+    let totalPctErr = 0;
+    let gradedCount = 0;
+
+    for (const f of fields){
+        const v = parseCurrency(f.elI.value);
+        if (!isFinite(v)) { setStatus(f.st,'bad'); f.st.textContent='Missed'; f.hint.textContent='Enter a number.'; allCorrect=false; continue; }
+        const res = gradeField(v, f.truth);
+        setStatus(f.st, res.status);
+        f.st.textContent = res.status==='ok' ? 'Correct' : res.status==='warn' ? 'Almost' : 'Missed';
+        f.hint.textContent = (res.status==='bad') ? maybeHint(f.key, v, tr, scn) : '';
+        totalPctErr += Math.min(res.errPct, 1); // cap at 100% to not skew
+        gradedCount++;
+        if (res.status!=='ok') allCorrect=false;
+    }
+    // Scoreboard update
+    const sc = loadScore();
+    sc.attempted += 1;
+    if (allCorrect) sc.correct += 1;
+    sc.totalError += (gradedCount>0 ? totalPctErr/gradedCount : 0);
+    sc.gradedFields += 1; // track per-problem average error entries
+    saveScore(sc);
+    updateScoreUI(sc);
+}
+
+/** ---------- Event Listeners ---------- */
+els.difficulty.addEventListener('change', ()=>{
+    problemIndex = 0;
+    newScenario();
+});
+els.timing.addEventListener('change', ()=>{
+    state.contribTiming = els.timing.value;
+    els.timingLabel.textContent = state.contribTiming;
+    // Recompute savings with new timing
+    state.truth = computeTruth(state.scenario, state.contribTiming);
+    renderScenario();
+});
+els.reseed.addEventListener('click', ()=>{
+    const newSeed = (Math.random()*0xFFFFFFFF)>>>0;
+    els.seedInput.value = String(newSeed);
+    problemIndex = 0;
+    newScenario();
+});
+els.newProblem.addEventListener('click', ()=>{
+    problemIndex++;
+    newScenario();
+});
+els.resetRun.addEventListener('click', ()=>{
+    // Clear scoreboard and restart
+    localStorage.removeItem(SCORE_KEY);
+    updateScoreUI(loadScore());
+    problemIndex = 0;
+    newScenario();
+});
+els.recalc.addEventListener('click', ()=>{
+    recalcWithEdits();
+    // Reformat inputs after parsing
+    renderScenario();
+});
+els.check.addEventListener('click', ()=>{
+    gradeAll();
+});
+els.showSolution.addEventListener('click', ()=>{
+    if (els.solutionBlock.classList.contains('hidden')){
+        els.solutionBlock.textContent = buildSolutionText(state.scenario, state.truth);
+        els.solutionBlock.classList.remove('hidden');
+        els.showSolution.textContent = 'Hide Solution';
+        // Update BA II Plus block too
+        // (sanity-check block removed)
+    } else {
+        els.solutionBlock.classList.add('hidden');
+        els.showSolution.textContent = 'Show Solution';
+    }
+});
+els.toggleTruth.addEventListener('click', ()=>{
+    const hidden = els.truthBlock.classList.toggle('hidden');
+    els.toggleTruth.textContent = hidden ? 'Show Details' : 'Hide Details';
+});
+
+/** ---------- Init ---------- */
+function init(){
+    // Seed + defaults
+    els.seedInput.value = String(baseSeed);
+    els.difficulty.value = state.difficulty;
+    els.timing.value = state.contribTiming;
+    els.timingLabel.textContent = state.contribTiming;
+
+    // Score
+    updateScoreUI(loadScore());
+
+    // First scenario
+    newScenario();
+
+    // Unit tests (console)
+    runTests();
+}
+document.addEventListener('DOMContentLoaded', init);
+
+/** ---------- Unit Tests ---------- */
+function approxEq(a,b,eps=1e-8){ return Math.abs(a-b) <= eps * Math.max(1,Math.abs(a),Math.abs(b)); }
+function runTests(){
+    console.groupCollapsed('Unit Tests');
+    // Real rate basic
+    console.assert(approxEq(computeRealRate(0.05,0.05), 0), 'Real rate equal r==g -> 0');
+    // Annuity near-zero real rate
+    const cap0 = capitalAnnuity(1000, 1e-12, 25);
+    console.assert(Math.abs(cap0 - 1000*25) < 1e-6, 'Annuity with ~0 r_real ≈ PMT*RLE');
+    // CPM scaling property
+    const r=0.08,g=0.03,RLE=30, PMT1=50000;
+    const rr = computeRealRate(r,g);
+    const capA = capitalAnnuity(PMT1, rr, RLE);
+    const capC = capitalCPM(capA, r, RLE);
+    const denom = 1 - Math.pow(1+r, -RLE);
+    console.assert(approxEq(capC*denom, capA, 1e-10), 'CPM inverse scaling holds');
+    // PPPM scaling property
+    const ratio = (1+g)/(1+r);
+    const denomP = 1 - Math.pow(ratio, RLE);
+    const capP = capitalPPPM(capA, r, g, RLE);
+    console.assert(approxEq(capP*denomP, capA, 1e-10), 'PPPM inverse scaling holds');
+    // Savings: simple case N=1, PV=0
+    const pmt1 = annualSavings(0, 100, 0.10, 1, 'END');
+    console.assert(approxEq(pmt1, 100), 'One period, FV=100, END => PMT=100');
+    const pmt1b = annualSavings(0, 100, 0.10, 1, 'BEGIN');
+    console.assert(approxEq(pmt1b, 100/1.10), 'BEGIN divides by (1+r)');
+
+    console.log('All tests passed.');
+    console.groupEnd();
+}
+</script>
+</body>
+</html>
+
